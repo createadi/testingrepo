@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: "testify"
+  image: "docker.io/testify"
+spec:
+  type: service
+  owner: user:guest
+  lifecycle: experimental
