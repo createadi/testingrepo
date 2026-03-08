@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: "testasset"
+  image: "docker.io/testasset"
+spec:
+  type: service
+  owner: user:guest
+  lifecycle: experimental
