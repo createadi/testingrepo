@@ -1,9 +1,9 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: example-nodejs-template-existing-repo
-  title: Example Node.js Template (Existing Repo)
-  description: Scaffold Node.js service into an existing GitHub repository
+  name: existing-asset
+  title: Existing Asset Onboarding
+  description: Onboard your existing asset
 spec:
   owner: user:guest
   type: service
@@ -11,67 +11,178 @@ spec:
   parameters:
     - title: Asset Details
       required:
-        - name
+        - asset
+        - branch
+        - component
+        - email
+
       properties:
-        name:
-          title: Asset Name
+
+        asset:
+          title: Asset name
           type: string
-          description: Unique name of the component
+          description: Name of the asset
           ui:autofocus: true
 
-    - title: Docker Image
-      required:
-        - image_name
-      properties:
-        image_name:
-          title: Docker Image Name
+        branch:
+          title: Deployment Branch
           type: string
-          description: Docker image name of the component
+          description: Branch to deploy
+          enum: [dev, staging, prod]
+          default: dev
 
-    - title: Existing Repository
+        component:
+          title: Component name
+          type: string
+          description: Type of the component to be deployed
+          ui:widget: 'radio'
+          enum: [frontend, backend]
+
+        email:
+          title: Asset owner email
+          type: string
+          format: email
+          ui:autofocus: true
+
+    - title: Deployment details
+
       required:
-        - repoUrl
+        - githubrepo
+        - image
+        - hardware
+        - envs
       properties:
-        repoUrl:
+
+        githubrepo:
           title: GitHub Repository
           type: string
+          description: Name of the github repository
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
               - github.com
+            allowedOwners:
+              - createadi
+
+        image:
+          title: Image url
+          type: string
+          description: Application image url to be deployed
+          ui:autofocus: true
+
+        hardware:
+          title: Hardware requirements
+          type: string
+          description: Instace hardware requirements
+          ui:autofocus: true
+          ui:widget: 'select'
+          enum:
+            - vLow (CPULimit= 100m, CPU= 80m, MemoryLimit= 100Mi, Memory= 80Mi)
+            - Low (CPULimit= 1000m, CPU= 800m, MemoryLimit= 1000Mi, Memory= 800Mi)
+            - Medium (CPULimit=2000m, CPU= 1600m, MemoryLimit= 2400Mi, Memory= 2000Mi)
+            - High (CPULimit=4000m, CPU= 3500m, MemoryLimit= 8000Mi, Memory= 6500Mi)
+            - vHigh (CPULimit=8000m, CPU= 6500m, MemoryLimit= 8000Mi, Memory= 8000Mi)
+          default: vLow (CPULimit= 100m, CPU= 80m, MemoryLimit= 100Mi, Memory= 80Mi)
+
+        envs:
+          title: Environment Variables
+          type: array
+          description: Application specific environment variables
+          items:
+            type: object
+            required: [name, value]
+            properties:
+              name:
+                type: string
+              value:
+                type: string
+
+    - title: Kubernetes specific details
+      required:
+        - svc_targetport
+        - secrets
+        - hpa
+      
+      properties:
+
+        svc_targetport:
+          title: Container port
+          type: integer
+          description: Container port to listen
+          ui:autofocus: true
+
+        secrets:
+          title: Kubernetes secrets
+          type: array
+          description: Kubernetes secrets for pods
+          items:
+            type: object
+            required: [name, value]
+            properties:
+              name:
+                type: string
+              value:
+                type: string
+
+        hpa:
+          title: Horizontal scaling
+          type: string
+          description: Horizontal scaling requirements
+          ui:autofocus: true
+          ui:widget: 'select'
+          enum:
+            - disabled (min= 0, max= 0)
+            - low (min= 1, max= 2)
+            - medium (min= 2, max= 4)
+            - high (min= 4, max= 5)
+          default: disabled (min= 0, max= 0)
+
 
   steps:
-  - id: generate
-    name: Generate Node.js service files
-    action: fetch:template
-    input:
-      url: ./content
-      targetPath: .
-      values:
-        name: ${{ parameters.name }}
-        image_name: ${{ parameters.image_name }}
+    - id: generate
+      name: Generate Node.js service files
+      action: fetch:template
+      input:
+        url: ./content
+        targetPath: .
+        values:
+          asset: ${{ parameters.asset }}
+          image: ${{ parameters.image }}
+          branch: ${{ parameters.branch }}
+          component: ${{ parameters.component }}
+          email: ${{ parameters.email }}
+          hardware: ${{ parameters.hardware }}
+          hpa: ${{ parameters.hpa }}
 
-  - id: create-pr
-    name: Create Pull Request
-    action: publish:github:pull-request
-    input:
-      repoUrl: ${{ parameters.repoUrl }}
-      branchName: backstage-${{ parameters.name }}
-      title: "Add Node.js service scaffold"
-      description: "Scaffolded Node.js service and catalog-info.yaml via Backstage"
+    - id: push
+      name: Push files to existing repository
+      action: custom:git-push
+      input:
+        repoUrl: https://github.com/${{ parameters.githubrepo | parseRepoUrl | pick('owner') }}/${{ parameters.githubrepo | parseRepoUrl | pick('repo') }}.git
+        branch: main
+        commitMessage: "Add ${{ parameters.asset }} catalog-info file"
 
-  - id: notify
-    name: Notify
-    action: notification:send
-    input:
-      recipients: entity
-      entityRefs:
-        - user:default/guest
-      title: Template executed
-      info: Pull request created successfully in the existing repository
-      severity: normal
+    - id: register
+      name: Register component in Backstage catalog
+      action: catalog:register
+      input:
+        catalogInfoUrl: https://github.com/${{ parameters.githubrepo | parseRepoUrl | pick('owner') }}/${{ parameters.githubrepo | parseRepoUrl | pick('repo') }}/blob/main/catalog-info.yaml
+
+    - id: notify
+      name: Notify user
+      action: notification:send
+      input:
+        recipients: entity
+        entityRefs:
+          - user:default/guest
+        title: Template executed
+        info: Component successfully scaffolded, pushed to repository, and registered in Backstage
+        severity: normal
 
   output:
     links:
-      - title: Pull Request
-        url: ${{ steps['create-pr'].output.remoteUrl }}
+      - title: Repository
+        url: https://github.com/${{ parameters.githubrepo | parseRepoUrl | pick('owner') }}/${{ parameters.githubrepo | parseRepoUrl | pick('repo') }}
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}

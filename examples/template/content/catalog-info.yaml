@@ -1,9 +1,13 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ${{ values.name | dump }}
-  image: ${{ values.image_name | dump }}
+  name: ${{ values.asset | dump }}
+  description: "Deploys to ${{ values.branch }} branch"
+  annotations:
+    backstage.io/docker-image: ${{ values.image | dump }}
+    platform/hardware-profile: ${{ values.hardware | dump }}
+    platform/hpa-config: ${{ values.hpa | dump }}
 spec:
-  type: service
-  owner: user:guest
+  type: ${{ values.component | dump }}
+  owner: ${{ values.email | dump }}
   lifecycle: experimental
