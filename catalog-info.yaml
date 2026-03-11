@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: "GDAM"
+  description: "Deploys to dev branch"
+  annotations:
+    backstage.io/docker-image: "docker.io/testing"
+    platform/hardware-profile: "High (CPULimit=4000m, CPU= 3500m, MemoryLimit= 8000Mi, Memory= 6500Mi)"
+    platform/hpa-config: "medium (min= 2, max= 4)"
+spec:
+  type: "frontend"
+  owner: "aditya@gmail.com"
+  lifecycle: experimental
